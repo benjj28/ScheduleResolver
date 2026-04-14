@@ -1,52 +1,102 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/task_model.dart';
 import '../models/schedule_analysis.dart';
 
-class AiScheduleService extends ChangeNotifier{
-
+class AiScheduleService extends ChangeNotifier {
   ScheduleAnalysis? _currentAnalysis;
-  bool _isloading = false;
+  bool _isLoading = false;
   String? _errorMessage;
 
-  final String _apiKey ='';
+  // Siguraduhin na tama at kumpleto ang API Key mo rito
+  final String _apiKey = 'AIzaSyBX_lP4tqHdAOe1MypsOXqol81G2DC74Z0';
+
+  ScheduleAnalysis? get currentAnalysis => _currentAnalysis;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
   Future<void> analyzeSchedule(List<TaskModel> tasks) async {
+    if (tasks.isEmpty) return;
 
-    if(_apiKey.isEmpty || tasks.isEmpty) return;
-    _isloading = true;
+    _isLoading = true;
     _errorMessage = null;
+    _currentAnalysis = null; // I-reset ang lumang data habang nag-iisip ang AI
     notifyListeners();
 
     try {
+      final model = GenerativeModel(
+        model: 'gemini-2.5-flash',
+        apiKey: _apiKey,
+      );
 
-      final model = GenerativeModel(model:'gemini-2.5-flash', apiKey: _apiKey);
       final tasksJson = jsonEncode(tasks.map((t) => t.toJson()).toList());
-        try {
-          final prompt = '''
-          
-          You are an expert student scheduling assistant. The user has provided the following tasks for their day in JSON format: $tasksJson
-          
-          Your job is to analyze these tasks, identify any overlaps or conflicts in their start and end time and suggest a better balanced schedule
-          consider their urgency, importance, and required energy level.
-          
-          Please provide exactly 4 sections of markdown text:
-          
-          1. ### Detected Conflicts
-          List any Scheduling conflicts
-          2. Ranked Tasks
-          Rank which tasks need attention first based on the urgency, importance and energy. Provide a brief reason each.
-         
+
+      final prompt = '''
+      You are an expert student scheduling assistant. 
+      The user has provided the following tasks in JSON: $tasksJson
+
+      Analyze the tasks, identify overlaps, and suggest a balanced schedule.
+      
+      IMPORTANT: You must provide exactly these 4 sections starting with '###':
+      ### Detected Conflicts
+      ### Ranked Tasks
+      ### Recommended Schedule
+      ### Explanation
       ''';
 
-    } catch (e) {
-    finally {
+      final content = [Content.text(prompt)];
+      final response = await model.generateContent(content);
 
-        }
+      if (response.text != null && response.text!.isNotEmpty) {
+        _currentAnalysis = _parseResponse(response.text!);
+      } else {
+        _errorMessage = "AI returned an empty response.";
       }
-
+    } catch (e) {
+      _errorMessage = 'Failed to fetch AI data: $e';
+      print("DEBUG ERROR: $e"); // Lalabas ito sa console mo
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
+  }
+
+  ScheduleAnalysis _parseResponse(String fulltext) {
+    String conflicts = "No conflicts detected.";
+    String rankedTasks = "No tasks ranked.";
+    String recommendations = "No recommendations provided.";
+    String explanation = "No explanation provided.";
+
+    // Hatiin ang text base sa '###'
+    final sections = fulltext.split("###");
+
+    for (var section in sections) {
+      final trimmedSection = section.trim();
+
+      if (trimmedSection.startsWith('Detected Conflicts')) {
+        conflicts = trimmedSection.replaceFirst('Detected Conflicts', '').trim();
+      } else if (trimmedSection.startsWith('Ranked Tasks')) {
+        rankedTasks = trimmedSection.replaceFirst('Ranked Tasks', '').trim();
+      } else if (trimmedSection.startsWith('Recommended Schedule')) {
+        recommendations = trimmedSection.replaceFirst('Recommended Schedule', '').trim();
+      } else if (trimmedSection.startsWith('Explanation')) {
+        explanation = trimmedSection.replaceFirst('Explanation', '').trim();
+      }
+    }
+
+    return ScheduleAnalysis(
+      conflicts: conflicts,
+      rankedTasks: rankedTasks,
+      recommendedSchedule: recommendations,
+      explanation: explanation,
+    );
+  }
+
+  // Dagdag na function para i-clear ang error o analysis kung kailangan
+  void clearAnalysis() {
+    _currentAnalysis = null;
+    _errorMessage = null;
+    notifyListeners();
+  }
 }
