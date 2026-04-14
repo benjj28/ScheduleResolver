@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> ae00ca0 (detect conflicts, rank priorities, and generate a revised schedule.)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -35,4 +40,9 @@ class ScheduleResolverApp extends StatelessWidget {
       home: const DashboardScreen(),
     );
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> c4b1ceb (detect conflicts, rank priorities, and generate a revised schedule.)
+>>>>>>> ae00ca0 (detect conflicts, rank priorities, and generate a revised schedule.)
